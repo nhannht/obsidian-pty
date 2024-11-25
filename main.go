@@ -5,19 +5,17 @@ import (
 	"net/http"
 	"os/exec"
 	"sync"
+	"time"
 
 	"github.com/creack/pty"
 	"github.com/gorilla/websocket"
 )
 
-var (
-	upgrader = websocket.Upgrader{
-		CheckOrigin: func(r *http.Request) bool {
-			return true
-		},
-	}
-	mu sync.Mutex
-)
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
+}
 
 func handleConnections(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
@@ -32,21 +30,19 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 		}
 	}(conn)
 
-	mu.Lock()
-
+	// Create a new shell process
 	c := exec.Command("bash")
 	f, err := pty.Start(c)
 	if err != nil {
-		mu.Unlock()
 		log.Println("Error starting pty:", err)
 		return
 	}
 	defer func() {
-		if err := f.Close(); err != nil {
-			log.Println("Error closing pty:", err)
+		err := c.Process.Kill()
+		if err != nil {
+			log.Println("Error killing process:", err)
 		}
 	}()
-	mu.Unlock()
 
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -79,6 +75,21 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 			if err := conn.WriteMessage(websocket.TextMessage, buf[:n]); err != nil {
 				log.Println("Error writing message:", err)
 				return
+			}
+		}
+	}()
+
+	// Optional: Implement a ping-pong mechanism
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+					log.Println("Error sending ping:", err)
+					return
+				}
 			}
 		}
 	}()
