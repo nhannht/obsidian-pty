@@ -1,104 +1,134 @@
 package main
 
 import (
-	"log"
-	"net/http"
-	"os/exec"
-	"sync"
-	"time"
-
+	"encoding/json"
 	"github.com/creack/pty"
 	"github.com/gorilla/websocket"
+	"io"
+	"io/ioutil"
+	"log"
+	"net/http"
+	"os"
+	"os/exec"
+	"sync"
 )
 
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
+type ServerConfig struct {
+	Name    string `json:"name"`
+	Port    string `json:"port"`
+	Command string `json:"command"`
 }
 
-func handleConnections(w http.ResponseWriter, r *http.Request) {
-	conn, err := upgrader.Upgrade(w, r, nil)
+func loadConfig(filename string) ([]ServerConfig, error) {
+	file, err := os.Open(filename)
 	if err != nil {
-		log.Println("Error upgrading connection:", err)
-		return
+		return nil, err
 	}
-	defer func(conn *websocket.Conn) {
-		err := conn.Close()
-		if err != nil {
-			log.Println("Error closing connection:", err)
-		}
-	}(conn)
+	defer file.Close()
 
-	// Create a new shell process
-	c := exec.Command("bash")
-	f, err := pty.Start(c)
+	bytes, err := ioutil.ReadAll(file)
 	if err != nil {
-		log.Println("Error starting pty:", err)
-		return
+		return nil, err
 	}
-	defer func() {
-		err := c.Process.Kill()
+
+	var configs []ServerConfig
+	if err := json.Unmarshal(bytes, &configs); err != nil {
+		return nil, err
+	}
+
+	return configs, nil
+}
+
+func startServer(config ServerConfig) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		upgrader := websocket.Upgrader{
+			CheckOrigin: func(r *http.Request) bool {
+				return true
+			},
+		}
+
+		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
-			log.Println("Error killing process:", err)
+			log.Printf("Failed to upgrade connection: %v", err)
+			return
 		}
-	}()
+		defer conn.Close()
 
-	var wg sync.WaitGroup
-	wg.Add(2)
-
-	go func() {
-		defer wg.Done()
-		for {
-			_, msg, err := conn.ReadMessage()
-			if err != nil {
-				log.Println("Error reading message:", err)
-				return
-			}
-			_, err = f.Write(msg)
-			if err != nil {
-				log.Println("Error writing to pty:", err)
-				return
-			}
+		cmd := exec.Command(config.Command)
+		ptmx, err := pty.Start(cmd)
+		if err != nil {
+			log.Printf("Failed to start command: %v", err)
+			return
 		}
-	}()
-
-	go func() {
-		defer wg.Done()
-		buf := make([]byte, 1024)
-		for {
-			n, err := f.Read(buf)
+		defer func() {
+			err = ptmx.Close()
 			if err != nil {
-				log.Println("Error reading from pty:", err)
-				return
+				log.Printf("Error closing PTY: %v\n", err)
 			}
-			if err := conn.WriteMessage(websocket.TextMessage, buf[:n]); err != nil {
-				log.Println("Error writing message:", err)
-				return
-			}
-		}
-	}()
+		}() // Best effort
 
-	// Optional: Implement a ping-pong mechanism
-	go func() {
-		ticker := time.NewTicker(30 * time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-					log.Println("Error sending ping:", err)
+		var wg sync.WaitGroup
+		wg.Add(2)
+
+		go func() {
+			defer wg.Done()
+			for {
+				_, message, err := conn.ReadMessage()
+				if err != nil {
+					log.Printf("Error reading message: %v", err)
+					return
+				}
+				_, err = ptmx.Write(message)
+				if err != nil {
+					log.Println("Error writing to PTY: %v", err)
 					return
 				}
 			}
-		}
-	}()
+		}()
 
-	wg.Wait()
+		go func() {
+			defer wg.Done()
+			buf := make([]byte, 1024)
+			for {
+				n, err := ptmx.Read(buf)
+				if err != nil {
+					if err != io.EOF {
+						log.Printf("Error reading from PTY: %v", err)
+					}
+					return
+				}
+				if err := conn.WriteMessage(websocket.TextMessage, buf[:n]); err != nil {
+					log.Printf("Error writing message: %v", err)
+					return
+				}
+			}
+		}()
+
+		wg.Wait()
+		log.Printf("Connection closed for server %s", config.Name)
+	})
+
+	server := &http.Server{
+		Addr:    ":" + config.Port,
+		Handler: mux,
+	}
+
+	log.Printf("Starting server %s on port %s\n", config.Name, config.Port)
+	if err := server.ListenAndServe(); err != nil {
+		log.Fatalf("Failed to start server %s: %v", config.Name, err)
+	}
 }
 
 func main() {
-	http.HandleFunc("/ws", handleConnections)
-	log.Println("Server started on :8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	configs, err := loadConfig("server_config.json")
+	if err != nil {
+		log.Fatalf("Error loading config: %v", err)
+	}
+
+	for _, config := range configs {
+		go startServer(config)
+	}
+
+	select {} // Block forever
 }

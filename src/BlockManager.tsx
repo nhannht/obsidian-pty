@@ -1,86 +1,58 @@
 import ZenTerminalPlugin from "../main";
 import {createRoot} from "react-dom/client";
-import {StrictMode, useEffect, useRef} from "react";
-import {Terminal} from "@xterm/xterm";
-import {FitAddon} from '@xterm/addon-fit';
-import {FileSystemAdapter, MarkdownPostProcessorContext} from "obsidian";
+import {StrictMode} from "react";
+import {FileSystemAdapter} from "obsidian";
+import {exec} from "child_process";
+import {BlockSetting, ServerConfig} from "./global";
+import {ZenTermBlock} from "./ZenTermBlock";
+import net from "net";
+import path from "path";
+import fs from "fs";
 
-export function ZenTermBlock(props:{
-    plugin:ZenTerminalPlugin,
-    ctx:MarkdownPostProcessorContext,
-    src:string,
-}) {
-    const terminalRef = useRef<HTMLDivElement | null>(null);
-    const socketRef = useRef<WebSocket|null>(null);
-	const hasExecutedRef = useRef<boolean>(false);
-
-    useEffect(() => {
-		const vaultAdapter = props.plugin.app.vault.adapter as FileSystemAdapter
-		const vaultPath = vaultAdapter.getBasePath()
-
-        if (terminalRef.current) {
-            const terminal = new Terminal();
-            const fitAddon = new FitAddon();
-            terminal.loadAddon(fitAddon);
-            terminal.open(terminalRef.current);
-            fitAddon.fit();
-
-            const connectWebSocket = () => {
-                const socket = new WebSocket(`ws://localhost:8080/ws`);
-                socketRef.current = socket;
-
-                socket.onopen = () => {
-                    terminal.onData(data => {
-                        socket.send(data);
-                    });
-
-
-                };
-
-                socket.onmessage = (event) => {
-                    const message = event.data;
-                    terminal.write(message);
-                };
-
-                socket.onclose = () => {
-                    console.log("WebSocket closed, attempting to reconnect...");
-                    setTimeout(connectWebSocket, 5000); // Reconnect after 1 second
-                };
-
-                socket.onerror = (error) => {
-                    console.error("WebSocket error:", error);
-                    socket.close();
-                };
-            };
-
-            connectWebSocket();
-            return () => {
-                socketRef.current?.close();
-            }
-        }
-    }, []);
-
-    return (
-        <div ref={terminalRef} style={{width: '100%', height: '100%'}}></div>
-    );
-}
 
 export default class BlockManager {
-    constructor(public plugin: ZenTerminalPlugin) {
-    }
 
-    async registerZenTermBlock() {
-        this.plugin.registerMarkdownCodeBlockProcessor("term", async (source, el, ctx) => {
-            let root = el.createEl("div", {
-                "cls": "root"
-            })
 
-            let reactRoot = createRoot(root)
-            reactRoot.render(
-                <StrictMode>
-                    <ZenTermBlock ctx={ctx} src={source} plugin={this.plugin}/>
-                </StrictMode>
-            )
-        })
-    }
+	constructor(public plugin: ZenTerminalPlugin,
+	) {
+	}
+
+
+	loadServerConfigs(){
+		const vaultAdapter = this.plugin.app.vault.adapter as FileSystemAdapter;
+		const vaultPath = vaultAdapter.getBasePath();
+		const configPath = path.join(vaultPath, ".obsidian/plugins/obsidian-dump-terminal/server_config.json");
+
+		try {
+			const data = fs.readFileSync(configPath, "utf-8");
+			const server_profiles = JSON.parse(data) as ServerConfig[];
+			console.log("Loaded server configurations:", server_profiles);
+			return server_profiles
+		} catch (error) {
+			console.error("Error loading server configurations:", error);
+		}
+		return []
+	}
+
+	async registerZenTermBlock() {
+		this.plugin.registerMarkdownCodeBlockProcessor("term", async (source, el, ctx) => {
+			const blockSetting: BlockSetting = JSON.parse(source)
+
+			let root = el.createEl("div", {
+				"cls": "root"
+			})
+
+			let reactRoot = createRoot(root)
+			reactRoot.render(
+				<StrictMode>
+					<ZenTermBlock
+						ctx={ctx}
+
+						blockSetting={blockSetting}
+						server_profiles={this.loadServerConfigs()}
+						plugin={this.plugin}/>
+				</StrictMode>
+			)
+		})
+	}
 }
