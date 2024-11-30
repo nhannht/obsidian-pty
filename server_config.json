@@ -6,7 +6,7 @@
 	},
 	{
 		"name": "fish server",
-		"command": "/usr/bin/fish",
+		"command": "sh -c /usr/bin/fish",
 		"port": "12346"
 	}
 ]

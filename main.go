@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"regexp"
 	"sync"
 )
 
@@ -39,6 +40,23 @@ func loadConfig(filename string) ([]ServerConfig, error) {
 	return configs, nil
 }
 
+func splitCommand(command string) []string {
+	// Regular expression to match words or quoted strings
+	re := regexp.MustCompile(`"([^"]*)"|'([^']*)'|(\S+)`)
+	matches := re.FindAllStringSubmatch(command, -1)
+
+	var parts []string
+	for _, match := range matches {
+		for _, group := range match[1:] {
+			if group != "" {
+				parts = append(parts, group)
+				break
+			}
+		}
+	}
+	return parts
+}
+
 func startServer(config ServerConfig) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -54,8 +72,8 @@ func startServer(config ServerConfig) {
 			return
 		}
 		defer conn.Close()
-
-		cmd := exec.Command(config.Command)
+		cmdParts := splitCommand(config.Command)
+		cmd := exec.Command(cmdParts[0], cmdParts[1:]...)
 		ptmx, err := pty.Start(cmd)
 		if err != nil {
 			log.Printf("Failed to start command: %v", err)

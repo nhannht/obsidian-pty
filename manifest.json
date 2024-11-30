@@ -1,10 +1,10 @@
 {
-	"id": "obsidian-zen-terminal",
-	"name": "Zen Terminal",
+	"id": "obsidian-pty",
+	"name": "obsidian-pty",
 	"version": "0.1.0",
 	"minAppVersion": "0.1.0",
-	"description": "Inject terminal everywhere",
-	"author": "Obsidian",
+	"description": "Interact with any linux commands, such as terminal, via pty",
+	"author": "nhannht",
 	"authorUrl": "https://github.com/nhannht",
 
 	"isDesktopOnly": true
