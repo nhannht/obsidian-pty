@@ -1,7 +1,7 @@
 {
-	"name": "obsidian-zen-terminal",
+	"name": "obsidian-pty",
 	"version": "0.1.0",
-	"description": "Just a zen terminal for obsidian",
+	"description": "it just pty",
 	"main": "main.js",
 	"scripts": {
 		"dev": "concurrently 'node esbuild.config.mjs' 'npx tailwindcss -w -i src/main.css -o styles.css'",
