@@ -1,7 +1,7 @@
 import {Plugin} from 'obsidian';
 import BlockManager from "./src/BlockManager";
 
-export default class ZenTerminalPlugin extends Plugin {
+export default class PTYPlugin extends Plugin {
 	blockManager = new BlockManager(this);
 
 	async onload() {

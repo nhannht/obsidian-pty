@@ -1,4 +1,4 @@
-import ZenTerminalPlugin from "../main";
+import PTYPlugin from "../main";
 import {MarkdownPostProcessorContext} from "obsidian";
 import {BlockSetting, ServerConfig} from "./global";
 import {Terminal} from "@xterm/xterm";
@@ -7,10 +7,11 @@ import {FitAddon} from '@xterm/addon-fit';
 
 
 export function ZenTermBlock(props: {
-	plugin: ZenTerminalPlugin,
+	plugin: PTYPlugin,
 	ctx: MarkdownPostProcessorContext,
 	blockSetting: BlockSetting,
 	server_profiles: ServerConfig[],
+	className?: string
 }) {
 	const terminalRef = useRef<HTMLDivElement | null>(null);
 	const socketRef = useRef<WebSocket | null>(null);
@@ -69,6 +70,6 @@ export function ZenTermBlock(props: {
 	}, []);
 
 	return (
-		<div ref={terminalRef} style={{width: "100%", height: "100%" }}></div>
+		<div className={props.className} ref={terminalRef} style={{width: "100%", height: "100%" }}></div>
 	);
 }

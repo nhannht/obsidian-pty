@@ -1,6 +1,6 @@
-import ZenTerminalPlugin from "../main";
+import PTYPlugin from "../main";
 
 export default class BackEndManager {
-	constructor(public plugin: ZenTerminalPlugin,) {}
+	constructor(public plugin: PTYPlugin,) {}
 
 }

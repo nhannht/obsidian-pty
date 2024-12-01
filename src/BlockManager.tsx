@@ -1,4 +1,4 @@
-import ZenTerminalPlugin from "../main";
+import PTYPlugin from "../main";
 import {createRoot} from "react-dom/client";
 import {StrictMode} from "react";
 import {FileSystemAdapter} from "obsidian";
@@ -13,7 +13,7 @@ import fs from "fs";
 export default class BlockManager {
 
 
-	constructor(public plugin: ZenTerminalPlugin,
+	constructor(public plugin: PTYPlugin,
 	) {
 	}
 
@@ -46,6 +46,7 @@ export default class BlockManager {
 			reactRoot.render(
 				<StrictMode>
 					<ZenTermBlock
+						className={"twp"}
 						ctx={ctx}
 
 						blockSetting={blockSetting}
