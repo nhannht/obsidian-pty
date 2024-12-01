@@ -5,7 +5,7 @@
 
 ## Example of terminal emulator
 
-- Compile the main.go, run the binary, the backend will parse file "server_config.json" (put both back-end executable and the config file in your ${vault_dir}/.obsidian/plugins/obsidian-pty/), and run multi servers for each pty in the desired ports. Example of server config
+- Compile the main.go, run the binary, it will read config from "server_config.json" (put both back-end executable and the config file in your ${vault_dir}/.obsidian/plugins/obsidian-pty/) and will run multi servers in parallel for each profile in the setup ports. Example of server config
 ```json
 [
 	{
@@ -27,11 +27,10 @@
 - Connect with the pty in obsidian markdown file using the name
 ````
 ```term
-```
 {
 "name": "fish server or naming anything you like, this field was treated like an id"
 }
-
+```
 ````
 
 - Well, and it just worked, you have a terminal. 
