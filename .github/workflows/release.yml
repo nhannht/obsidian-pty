@@ -54,5 +54,5 @@ jobs:
                   gh release create "$tag" \
                   --title="$tag" \
                   --draft \
-                  --notes-file=CHANGELOG_temp.md \
+#                  --notes-file=CHANGELOG_temp.md \
                   main.js manifest.json styles.css README.md pty-server
