@@ -5,9 +5,9 @@
 
 ## Example of terminal emulator
 #### Install from source
-- Clone the repo into ${vault_path}/.obsidian/plugins/
+- Clone the repo into ${vault_path}/.obsidian/plugins/obsidian-pty
 - Compile the main.go using go build, and compile the main.ts by yarn -> yarn run build
-- Create the server_config.json file with the syntax like the example below, it must be put the ${vault_path}/.obsidian/plugins/
+- Create the server_config.json file with the syntax like the example below
 - Run the binary, it will read config from "server_config.json" (put both back-end executable and the config file in your ${vault_dir}/.obsidian/plugins/obsidian-pty/) and will run multi servers in parallel for each profile in the setup ports.
 - Example of server config
 ```json
