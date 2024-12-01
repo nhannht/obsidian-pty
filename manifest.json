@@ -1,7 +1,7 @@
 {
 	"id": "obsidian-pty",
 	"name": "obsidian-pty",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"minAppVersion": "0.1.0",
 	"description": "Interact with any linux commands, such as terminal, via pty",
 	"author": "nhannht",
