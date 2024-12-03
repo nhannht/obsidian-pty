@@ -21,10 +21,10 @@ export default class BlockManager {
 	loadServerConfigs(){
 		const vaultAdapter = this.plugin.app.vault.adapter as FileSystemAdapter;
 		const vaultPath = vaultAdapter.getBasePath();
-		const configPath = path.join(vaultPath, ".obsidian/plugins/obsidian-dump-terminal/server_config.json");
+
 
 		try {
-			const data = fs.readFileSync(configPath, "utf-8");
+			const data = fs.readFileSync(this.plugin.serverConfigPath, "utf-8");
 			const server_profiles = JSON.parse(data) as ServerConfig[];
 			console.log("Loaded server configurations:", server_profiles);
 			return server_profiles

@@ -1,5 +1,5 @@
 import PTYPlugin from "../main";
-import {MarkdownPostProcessorContext} from "obsidian";
+import {MarkdownPostProcessorContext, Notice} from "obsidian";
 import {BlockSetting, ServerConfig} from "./global";
 import {Terminal} from "@xterm/xterm";
 import {useEffect, useRef} from "react";
@@ -29,21 +29,27 @@ export function ZenTermBlock(props: {
 			setTimeout(() => fitAddon.fit(), 0)
 			// window.addEventListener('resize', () => fitAddon.fit());
 			if (profile) {
+				let countRetries = 0
 				// console.log("We have profile")
-				const connectWebSocket = () => {
+				const connectWebSocket = (retries:number) => {
+					retries +=1
+					if (retries > 5) {
+						new Notice("Retries to connected more than 5 times but still failed, giving up")
+						return 
+					}
 					const socket = new WebSocket(`ws://localhost:${profile.port}/`);
-					console.log(socket)
+					// console.log(socket)
 					socketRef.current = socket;
 
 					socket.onopen = () => {
-						console.log('WebSocket connection established');
+						// console.log('WebSocket connection established');
 						terminal.onData(data => {
 							socket.send(data)
 						})
 					};
 
 					socket.onmessage = (event) => {
-						console.log(`on message: ${event.data}  `);
+						// console.log(`on message: ${event.data}  `);
 						terminal.write(event.data);
 						// terminal.scrollToBottom()
 						// fitAddon.fit();
@@ -52,7 +58,7 @@ export function ZenTermBlock(props: {
 
 					socket.onclose = () => {
 						console.log('WebSocket connection closed,attempting to reconnect...');
-						setTimeout(connectWebSocket, 5000);
+						setTimeout(()=>connectWebSocket(retries), 5000);
 					};
 
 					socket.onerror = (error) => {
@@ -60,7 +66,7 @@ export function ZenTermBlock(props: {
 						socket.close()
 					};
 				}
-				connectWebSocket()
+				connectWebSocket(0)
 			}
 		}
 		return () => {

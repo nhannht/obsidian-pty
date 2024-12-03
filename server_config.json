@@ -1,12 +1,12 @@
 [
-	{
-		"name": "bash server",
-		"command": "/usr/bin/bash",
-		"port": "12345"
-	},
-	{
-		"name": "fish server",
-		"command": "sh -c /usr/bin/fish",
-		"port": "12346"
-	}
+  {
+    "name": "Bash",
+    "port": 12345,
+    "command": "bash"
+  },
+  {
+    "name": "Fish",
+    "port": 12346,
+    "command": "fish"
+  }
 ]

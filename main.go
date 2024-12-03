@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"github.com/creack/pty"
 	"github.com/gorilla/websocket"
 	"io"
@@ -10,13 +11,15 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
+	"strconv"
 	"sync"
 )
 
 type ServerConfig struct {
 	Name    string `json:"name"`
-	Port    string `json:"port"`
+	Port    int64  `json:"port"`
 	Command string `json:"command"`
 }
 
@@ -128,18 +131,27 @@ func startServer(config ServerConfig) {
 	})
 
 	server := &http.Server{
-		Addr:    ":" + config.Port,
+		Addr:    ":" + strconv.FormatInt(config.Port, 10),
 		Handler: mux,
 	}
 
-	log.Printf("Starting server %s on port %s\n", config.Name, config.Port)
+	log.Printf("Starting server %s on port %v\n", config.Name, config.Port)
 	if err := server.ListenAndServe(); err != nil {
 		log.Fatalf("Failed to start server %s: %v", config.Name, err)
 	}
 }
 
 func main() {
-	configs, err := loadConfig("server_config.json")
+	execPath, err := os.Executable()
+	if err != nil {
+		log.Fatalf("Error getting executable path: %v", err)
+	}
+	execDir := filepath.Dir(execPath)
+	defaultConfigPath := filepath.Join(execDir, "server_config.json")
+	configPath := flag.String("config", defaultConfigPath, "Path to the server configuration file")
+	flag.Parse()
+
+	configs, err := loadConfig(*configPath)
 	if err != nil {
 		log.Fatalf("Error loading config: %v", err)
 	}
