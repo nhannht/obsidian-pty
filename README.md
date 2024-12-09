@@ -13,12 +13,12 @@
 ```json
 [
 	{
-		"name": "bash server",
+		"name": "bash backend",
 		"command": "/usr/bin/bash",
 		"port": "12345"
 	},
 	{
-		"name": "fish server or naming anything you like, this field was treated like an id",
+		"name": "fish backend or naming anything you like, this field was treated like an id",
 		"command": "sh -c /usr/bin/fish",
 		"port": "12346"
 	}

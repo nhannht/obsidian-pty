@@ -3,162 +3,115 @@ package main
 import (
 	"encoding/json"
 	"flag"
-	"github.com/creack/pty"
-	"github.com/gorilla/websocket"
-	"io"
-	"io/ioutil"
+	"fmt"
+	"github.com/nhannht/obsidian-zen-terminal/src/backend"
 	"log"
-	"net/http"
 	"os"
-	"os/exec"
-	"path/filepath"
-	"regexp"
-	"strconv"
-	"sync"
 )
 
-type ServerConfig struct {
-	Name    string `json:"name"`
-	Port    int64  `json:"port"`
-	Command string `json:"command"`
-}
-
-func loadConfig(filename string) ([]ServerConfig, error) {
-	file, err := os.Open(filename)
+func printJSON(result backend.Result) {
+	jsonData, err := json.Marshal(result)
 	if err != nil {
-		return nil, err
+		log.Printf("Error marshalling JSON: %v", err)
+		return
 	}
-	defer file.Close()
+	fmt.Println(string(jsonData))
+}
 
-	bytes, err := ioutil.ReadAll(file)
+func printScanResult(result backend.ScanResult) {
+	jsonData, err := json.Marshal(result)
 	if err != nil {
-		return nil, err
+		log.Printf("Error marshalling JSON: %v", err)
+		return
 	}
-
-	var configs []ServerConfig
-	if err := json.Unmarshal(bytes, &configs); err != nil {
-		return nil, err
-	}
-
-	return configs, nil
-}
-
-func splitCommand(command string) []string {
-	// Regular expression to match words or quoted strings
-	re := regexp.MustCompile(`"([^"]*)"|'([^']*)'|(\S+)`)
-	matches := re.FindAllStringSubmatch(command, -1)
-
-	var parts []string
-	for _, match := range matches {
-		for _, group := range match[1:] {
-			if group != "" {
-				parts = append(parts, group)
-				break
-			}
-		}
-	}
-	return parts
-}
-
-func startServer(config ServerConfig) {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		upgrader := websocket.Upgrader{
-			CheckOrigin: func(r *http.Request) bool {
-				return true
-			},
-		}
-
-		conn, err := upgrader.Upgrade(w, r, nil)
-		if err != nil {
-			log.Printf("Failed to upgrade connection: %v", err)
-			return
-		}
-		defer conn.Close()
-		cmdParts := splitCommand(config.Command)
-		cmd := exec.Command(cmdParts[0], cmdParts[1:]...)
-		ptmx, err := pty.Start(cmd)
-		if err != nil {
-			log.Printf("Failed to start command: %v", err)
-			return
-		}
-		defer func() {
-			err = ptmx.Close()
-			if err != nil {
-				log.Printf("Error closing PTY: %v\n", err)
-			}
-		}() // Best effort
-
-		var wg sync.WaitGroup
-		wg.Add(2)
-
-		go func() {
-			defer wg.Done()
-			for {
-				_, message, err := conn.ReadMessage()
-				if err != nil {
-					log.Printf("Error reading message: %v", err)
-					return
-				}
-				_, err = ptmx.Write(message)
-				if err != nil {
-					log.Println("Error writing to PTY: %v", err)
-					return
-				}
-			}
-		}()
-
-		go func() {
-			defer wg.Done()
-			buf := make([]byte, 1024)
-			for {
-				n, err := ptmx.Read(buf)
-				if err != nil {
-					if err != io.EOF {
-						log.Printf("Error reading from PTY: %v", err)
-					}
-					return
-				}
-				if err := conn.WriteMessage(websocket.TextMessage, buf[:n]); err != nil {
-					log.Printf("Error writing message: %v", err)
-					return
-				}
-			}
-		}()
-
-		wg.Wait()
-		log.Printf("Connection closed for server %s", config.Name)
-	})
-
-	server := &http.Server{
-		Addr:    ":" + strconv.FormatInt(config.Port, 10),
-		Handler: mux,
-	}
-
-	log.Printf("Starting server %s on port %v\n", config.Name, config.Port)
-	if err := server.ListenAndServe(); err != nil {
-		log.Fatalf("Failed to start server %s: %v", config.Name, err)
-	}
+	fmt.Println(string(jsonData))
 }
 
 func main() {
-	execPath, err := os.Executable()
-	if err != nil {
-		log.Fatalf("Error getting executable path: %v", err)
-	}
-	execDir := filepath.Dir(execPath)
-	defaultConfigPath := filepath.Join(execDir, "server_config.json")
-	configPath := flag.String("config", defaultConfigPath, "Path to the server configuration file")
+
+	// Define the "server" flag
+	server := flag.Bool("server", false, "Start the server with the specified configuration")
+
+	// Define the "scan" flag with sub-options
+	scan := flag.String("scan", "", "Scan options: 'isfree' to check if a port is free, 'process' to find the process using a port")
+
+	// Define the "process" flag with sub-options
+	process := flag.String("process", "", "Process options: 'kill' to terminate the process on a port")
+
+	// Define flags for Name, Port, and Command
+	name := flag.String("name", "default", "Name of the server")
+	port := flag.Int64("port", 8080, "Port number for the server")
+	command := flag.String("command", "bash", "Command to run in the server")
+
 	flag.Parse()
 
-	configs, err := loadConfig(*configPath)
-	if err != nil {
-		log.Fatalf("Error loading config: %v", err)
+	// Check if the "server" flag is set
+	if *server {
+		// Ensure that "name", "port", and "command" are provided
+		if *name == "" || *port == 0 || *command == "" {
+			message := "Error: 'name', 'port', and 'command' flags are required when 'server' is specified."
+			printJSON(backend.Result{Message: message})
+			flag.Usage()
+			os.Exit(1)
+		}
+
+		// Create a ServerConfig using the parsed flags
+		config := backend.ServerConfig{
+			Name:    *name,
+			Port:    *port,
+			Command: *command,
+		}
+
+		// Start the server with the provided configuration
+		go backend.StartServer(config)
+
+		// Block forever
+		select {}
+	} else if *scan != "" {
+		switch *scan {
+		case "isfree":
+			freeQ := backend.IsPortFree(*port)
+			message := fmt.Sprintf("Port %d is free: %v\n", *port, freeQ)
+			printJSON(backend.Result{Message: message})
+
+		case "process":
+			proc, err := backend.GetProcessByPort(*port)
+			if err != nil {
+				printJSON(backend.Result{Message: fmt.Sprintf("Error: %v", err)})
+			} else {
+				name, _ := proc.Name()
+				printScanResult(backend.ScanResult{
+					Port:    *port,
+					Pid:     int64(proc.Pid),
+					Process: name,
+				})
+			}
+		default:
+			message := "Invalid scan option. Use 'isfree' or 'process'."
+			printJSON(backend.Result{Message: message})
+			flag.Usage()
+			os.Exit(1)
+		}
+		return
+	} else if *process != "" {
+		switch *process {
+		case "kill":
+			err := backend.KillProcessByPort(*port)
+			if err != nil {
+				printJSON(backend.Result{Message: fmt.Sprintf("Error: %v", err)})
+			} else {
+				message := fmt.Sprintf("Process on port %d has been killed.", *port)
+				printJSON(backend.Result{Message: message})
+			}
+		default:
+			message := "Invalid process option. Use '-process kill -port xxx'."
+			printJSON(backend.Result{Message: message})
+			os.Exit(1)
+		}
+		return
+	} else {
+		flag.Usage()
+
 	}
 
-	for _, config := range configs {
-		go startServer(config)
-	}
-
-	select {} // Block forever
 }

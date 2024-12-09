@@ -1,157 +1,135 @@
-import {FileSystemAdapter, Notice, Plugin} from 'obsidian';
+import {FileSystemAdapter, Plugin} from 'obsidian';
 import BlockManager from "./src/BlockManager";
 import * as fs from 'fs';
-import * as https from 'https';
 import {exec} from "child_process";
 import {ServerConfig} from "./src/global";
 import path from "path";
+import find from "find-process"
+import ConfigManager from "./src/ConfigManager";
+
+export type ObsidianPtySetting = {
+	serverExecutablePath: string;
+	serverConfigPath: string;
+}
 
 export default class PTYPlugin extends Plugin {
-	blockManager = new BlockManager(this);
+	configManager = new ConfigManager(this);
+	// settings:ObsidianPtySetting;
 	adapter = this.app.vault.adapter as FileSystemAdapter
-	serverExecutablePath = path.join(this.adapter.getBasePath(), '.obsidian', 'plugins', 'obsidian-pty', 'pty-server');
-	serverConfigPath = path.join(this.adapter.getBasePath(), '.obsidian', 'plugins', 'obsidian-pty', 'server_config.json');
+	blockManager = new BlockManager(this);
+	// DEFAULT_SETTING:ObsidianPtySetting = {
+	// }
+
+	serverConfigPath = path.join(this.adapter.getBasePath(), '.obsidian', 'plugins', 'obsidian-pty', 'server_config.json')
+
 	serverProcess: ReturnType<typeof exec> | null = null;
-	manifestPath = path.join(this.adapter.getBasePath(), '.obsidian', 'plugins', 'obsidian-pty', 'manifest.json');
 
-	readManifestFileData = () => {
-		const text = fs.readFileSync(this.manifestPath, 'utf8');
-		return JSON.parse(text);
-	}
 
-	checkIfBackEndExecutableExist(): boolean {
-		try {
-			return fs.existsSync(this.serverExecutablePath);
-		} catch (err) {
-			console.error(`Error checking if executable exists: ${err.message}`);
-			return false;
-		}
-	}
-	
-	checkIfServerConfigExist = ()=>{
-		try {
-			return fs.existsSync(this.serverConfigPath);
-		} catch (err) {
-			console.error(`Error checking if server config exists: ${err.message}`);
-			return false;
-		}
-	}
-	
-	createInitConfig = ()=>{
-		let initConfig:ServerConfig[] = [{
-			name:'Bash',
-			port:12345,
-			command:'bash'
+	createInitConfig = () => {
+		let initConfig: ServerConfig[] = [{
+			name: 'Bash',
+			port: 12345,
+			command: 'bash'
 		}, {
 			name: 'Fish',
 			port: 12346,
-			command:'fish'
+			command: 'fish'
 		}]
 		// create file server_config.json
 		try {
 			fs.writeFileSync(this.serverConfigPath, JSON.stringify(initConfig, null, 2));
-			console.log('Initial server configuration created.');
+			console.log('Initial backend configuration created.');
 		} catch (err) {
 			console.error(`Error creating initial server configuration: ${err.message}`);
 		}
-		
+
 	}
-	
-	startBackendServer = ()=> {
-		if (!this.checkIfBackEndExecutableExist()){
-			new Notice("There is no back end executable, we start to download it",5000)
-			this.downloadBackendExecutable()
-		}
+
+
+	// async loadSettings(){
+	// 	this.settings = Object.assign({},this.DEFAULT_SETTING,await this.loadData())
+	// }
+	// async saveSettings() {
+	// 	await this.saveData(this.settings);
+	// }
+	killServer() {
 		if (this.serverProcess) {
-			new Notice("For some unknown reason the old process of server still running, now we will kill it.",5000)
-			this.serverProcess.kill()
+			this.serverProcess.kill();
+			console.log('Backend backend stopped.')
 		}
-		if (!this.checkIfServerConfigExist()) {
-			new Notice("No server configuration found, we will create a simple ones.",5000)
-			this.createInitConfig()
 
-		}
-		this.serverProcess = exec(this.serverExecutablePath, (error, stdout, stderr) => {
-			if (error) {
-				console.error(`Error starting server: ${error.message}`);
-				return;
-			}
-			if (stderr) {
-				console.error(`Server stderr: ${stderr}`);
-				return;
-			}
-			console.log(`Server stdout: ${stdout}`);
-		});
-		console.log('Backend server started.');
 	}
 
-	downloadFile = (url: string) => {
-		https.get(url, (response) => {
-			if (response.statusCode === 200) {
-				const file = fs.createWriteStream(this.serverExecutablePath);
-				response.pipe(file);
-				file.on('finish', () => {
-					file.close();
-					console.log('Download completed.');
-					// Set the file as executable
-					fs.chmod(this.serverExecutablePath, 0o755, (err) => {
-						if (err) {
-							console.error(`Error setting file as executable: ${err.message}`);
-						} else {
-							console.log('File permissions set to executable.');
-						}
-					});
-				});
-			} else if (response.statusCode === 302 || response.statusCode === 301) {
-				// Follow redirect
-				const redirectUrl = response.headers.location;
-				if (redirectUrl) {
-					console.log(`Redirecting to ${redirectUrl}`);
-					this.downloadFile(redirectUrl);
-				} else {
-					console.error('Redirect location not found.');
-				}
-			} else {
-				console.error(`Failed to download file: ${response.statusCode}`);
-			}
-		}).on('error', (err) => {
-			console.error(`Error: ${err.message}`);
-		});
-	};
+	async checkIfAllRequiredPortAreFree() {
+		let allPortAreFree = true
+		const serverConfig = JSON.parse(fs.readFileSync(this.serverConfigPath, 'utf8'))
+		for (const server of serverConfig) {
+			allPortAreFree = allPortAreFree && await this.findProcessByPort(server.port) === "0"
+		}
+		return allPortAreFree
+	}
 
 
-	downloadBackendExecutable = () => {
-		const version = this.readManifestFileData().version
-		const downloadUrl = `https://github.com/nhannht/obsidian-pty/releases/download/${version}/pty-server`
-		console.log(downloadUrl)
-		this.downloadFile(downloadUrl)
+	async findProcessByPort(port: number) {
 
-
-
+		let list = await find('port', port)
+		if (list.length === 0) {
+			return "0" // no process
+		} else {
+			return list[0]
+		}
 	}
 
 
 	async onload() {
 		await this.blockManager.registerZenTermBlock()
-		//region add download server command
-		this.addCommand({
-			name: "Download server",
-			id: "obsidian-pty-insert-server",
-			callback: () => this.downloadBackendExecutable()
-		})
-		this.startBackendServer()
-		//endregion
+
 
 	}
 
 	onunload() {
-		if (this.serverProcess){
-			this.serverProcess.kill();
-			console.log('Backend server stopped.')
-		}
+		this.app.workspace.off('quit', this.killServer)
 	}
 
 
 }
 
 
+// class SettingTab extends PluginSettingTab {
+// 	plugin:PTYPlugin;
+// 	constructor(app:App, plugin:PTYPlugin){
+// 		super(app,plugin);
+// 		this.plugin = plugin;
+// 	}
+// 	display(): void {
+// 		const {containerEl} = this;
+// 		containerEl.empty();
+// 		new Setting(containerEl)
+// 			.setName("Server executable path")
+// 			.setDesc("When your plugin loaded, it will executable this backend, and shut down it when plugin unloaded. By default the plugin will try to download the compiled binary from Github release if the file did not exist, but you can compiled it yourself if you want")
+// 			.addText(text => text
+// 				.setPlaceholder("Absolute path in your system")
+// 				.setValue(this.plugin.settings.serverExecutablePath)
+// 				.onChange(async (value)=>{
+// 					this.plugin.settings.serverExecutablePath = value;
+// 					await this.plugin.saveSettings()
+// 				})
+//
+// 			)
+//
+// 		new Setting(containerEl)
+// 			.setName("Server config path")
+// 			.setDesc("Server config path")
+// 			.addText(text => text
+// 				.setPlaceholder("Absolute path in your system")
+// 				.setValue(this.plugin.settings.serverConfigPath)
+// 				.onChange(async (value)=>{
+// 					this.plugin.settings.serverConfigPath = value;
+// 					await this.plugin.saveSettings()
+// 				})
+//
+// 			)
+//
+//
+// 	}
+// }

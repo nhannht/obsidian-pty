@@ -32,10 +32,9 @@ export function ZenTermBlock(props: {
 				let countRetries = 0
 				// console.log("We have profile")
 				const connectWebSocket = (retries:number) => {
-					retries +=1
 					if (retries > 5) {
 						new Notice("Retries to connected more than 5 times but still failed, giving up")
-						return 
+						return;
 					}
 					const socket = new WebSocket(`ws://localhost:${profile.port}/`);
 					// console.log(socket)
@@ -58,7 +57,7 @@ export function ZenTermBlock(props: {
 
 					socket.onclose = () => {
 						console.log('WebSocket connection closed,attempting to reconnect...');
-						setTimeout(()=>connectWebSocket(retries), 5000);
+						setTimeout(()=>connectWebSocket(retries+1), 5000);
 					};
 
 					socket.onerror = (error) => {

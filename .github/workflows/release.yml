@@ -21,7 +21,7 @@ jobs:
                     node-version: '21'
                     cache: 'yarn'
 
-            -   name: set up go
+            -   name: set up backend
                 uses: actions/setup-go@v5
                 with:
                     go-version: '^1.22.7'

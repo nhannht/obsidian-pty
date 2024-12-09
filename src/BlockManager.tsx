@@ -10,6 +10,9 @@ import path from "path";
 import fs from "fs";
 
 
+
+
+
 export default class BlockManager {
 
 
@@ -26,10 +29,10 @@ export default class BlockManager {
 		try {
 			const data = fs.readFileSync(this.plugin.serverConfigPath, "utf-8");
 			const server_profiles = JSON.parse(data) as ServerConfig[];
-			console.log("Loaded server configurations:", server_profiles);
+			console.log("Loaded backend configurations:", server_profiles);
 			return server_profiles
 		} catch (error) {
-			console.error("Error loading server configurations:", error);
+			console.error("Error loading backend configurations:", error);
 		}
 		return []
 	}
