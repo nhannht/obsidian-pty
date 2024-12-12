@@ -18,6 +18,16 @@ func printJSON(result backend.Result) {
 	fmt.Println(string(jsonData))
 }
 
+const (
+	ServerFlag  = "server"
+	ScanFlag    = "scan"
+	KillFlag    = "kill"
+	ProcessFlag = "process"
+	NameFlag    = "name"
+	PortFlag    = "port"
+	CommandFlag = "command"
+)
+
 func printScanResult(result backend.ScanResult) {
 	jsonData, err := json.Marshal(result)
 	if err != nil {
@@ -30,18 +40,19 @@ func printScanResult(result backend.ScanResult) {
 func main() {
 
 	// Define the "server" flag
-	server := flag.Bool("server", false, "Start the server with the specified configuration")
+	server := flag.Bool(ServerFlag, false, "Start the server with the specified configuration")
 
 	// Define the "scan" flag with sub-options
-	scan := flag.String("scan", "", "Scan options: 'isfree' to check if a port is free, 'process' to find the process using a port")
+	scan := flag.Bool(ScanFlag, false, "Scan options: 'isfree' to check if a port is free, 'process' to find the process using a port")
 
 	// Define the "process" flag with sub-options
-	process := flag.String("process", "", "Process options: 'kill' to terminate the process on a port")
+	process := flag.String(ProcessFlag, "", "Process options: 'kill' to terminate the process on a port")
 
 	// Define flags for Name, Port, and Command
-	name := flag.String("name", "default", "Name of the server")
-	port := flag.Int64("port", 8080, "Port number for the server")
-	command := flag.String("command", "bash", "Command to run in the server")
+
+	name := flag.String(NameFlag, "default", "Name of the server")
+	port := flag.Int64(PortFlag, 8080, "Port number for the server")
+	command := flag.String(CommandFlag, "bash", "Command to run in the server")
 
 	flag.Parse()
 
@@ -67,14 +78,12 @@ func main() {
 
 		// Block forever
 		select {}
-	} else if *scan != "" {
-		switch *scan {
-		case "isfree":
-			freeQ := backend.IsPortFree(*port)
-			message := fmt.Sprintf("Port %d is free: %v\n", *port, freeQ)
-			printJSON(backend.Result{Message: message})
-
-		case "process":
+	} else if *scan {
+		isFree := backend.IsPortFree(*port)
+		if isFree {
+			printJSON(backend.Result{Message: fmt.Sprintf("Port %d is free.", *port)})
+			return
+		} else {
 			proc, err := backend.GetProcessByPort(*port)
 			if err != nil {
 				printJSON(backend.Result{Message: fmt.Sprintf("Error: %v", err)})
@@ -84,18 +93,17 @@ func main() {
 					Port:    *port,
 					Pid:     int64(proc.Pid),
 					Process: name,
+					Status:  "busy",
+					Message: "This port is being used",
 				})
 			}
-		default:
-			message := "Invalid scan option. Use 'isfree' or 'process'."
-			printJSON(backend.Result{Message: message})
-			flag.Usage()
-			os.Exit(1)
+
 		}
+
 		return
 	} else if *process != "" {
 		switch *process {
-		case "kill":
+		case KillFlag:
 			err := backend.KillProcessByPort(*port)
 			if err != nil {
 				printJSON(backend.Result{Message: fmt.Sprintf("Error: %v", err)})

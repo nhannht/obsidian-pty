@@ -4,6 +4,8 @@ type ScanResult struct {
 	Port    int64  `json:"port"`
 	Pid     int64  `json:"pid"`
 	Process string `json:"process"`
+	Status  string `json:"status"`
+	Message string `json:"message"`
 }
 
 type Result struct {

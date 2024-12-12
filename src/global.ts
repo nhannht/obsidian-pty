@@ -3,12 +3,22 @@ import https from "https";
 
 export type BlockSetting = {
 	name: string,
+
 }
 // Remember to rename these classes and interfaces!
-export type ServerConfig = {
+export type ProfileConfig = {
 	name: string;
 	port: number,
 	command: string,
+
+}
+
+export type ScanResult = {
+	message?: string
+	port?: number
+	process?: string
+	pid? :number,
+	status?:string
 
 }
 

@@ -2,10 +2,11 @@ import {FileSystemAdapter, Plugin} from 'obsidian';
 import BlockManager from "./src/BlockManager";
 import * as fs from 'fs';
 import {exec} from "child_process";
-import {ServerConfig} from "./src/global";
+import {ProfileConfig} from "./src/global";
 import path from "path";
 import find from "find-process"
 import ConfigManager from "./src/ConfigManager";
+import ProfileManager from "./src/ProfileManager";
 
 export type ObsidianPtySetting = {
 	serverExecutablePath: string;
@@ -13,10 +14,12 @@ export type ObsidianPtySetting = {
 }
 
 export default class PTYPlugin extends Plugin {
-	configManager = new ConfigManager(this);
 	// settings:ObsidianPtySetting;
 	adapter = this.app.vault.adapter as FileSystemAdapter
+	configManager = new ConfigManager(this);
 	blockManager = new BlockManager(this);
+	profileManager = new ProfileManager(this)
+
 	// DEFAULT_SETTING:ObsidianPtySetting = {
 	// }
 
@@ -26,7 +29,7 @@ export default class PTYPlugin extends Plugin {
 
 
 	createInitConfig = () => {
-		let initConfig: ServerConfig[] = [{
+		let initConfig: ProfileConfig[] = [{
 			name: 'Bash',
 			port: 12345,
 			command: 'bash'
@@ -36,12 +39,6 @@ export default class PTYPlugin extends Plugin {
 			command: 'fish'
 		}]
 		// create file server_config.json
-		try {
-			fs.writeFileSync(this.serverConfigPath, JSON.stringify(initConfig, null, 2));
-			console.log('Initial backend configuration created.');
-		} catch (err) {
-			console.error(`Error creating initial server configuration: ${err.message}`);
-		}
 
 	}
 
@@ -52,43 +49,18 @@ export default class PTYPlugin extends Plugin {
 	// async saveSettings() {
 	// 	await this.saveData(this.settings);
 	// }
-	killServer() {
-		if (this.serverProcess) {
-			this.serverProcess.kill();
-			console.log('Backend backend stopped.')
-		}
 
-	}
-
-	async checkIfAllRequiredPortAreFree() {
-		let allPortAreFree = true
-		const serverConfig = JSON.parse(fs.readFileSync(this.serverConfigPath, 'utf8'))
-		for (const server of serverConfig) {
-			allPortAreFree = allPortAreFree && await this.findProcessByPort(server.port) === "0"
-		}
-		return allPortAreFree
-	}
-
-
-	async findProcessByPort(port: number) {
-
-		let list = await find('port', port)
-		if (list.length === 0) {
-			return "0" // no process
-		} else {
-			return list[0]
-		}
-	}
 
 
 	async onload() {
 		await this.blockManager.registerZenTermBlock()
+		// await this.profileManager.scanProfileOnPort(8080)
 
 
 	}
 
 	onunload() {
-		this.app.workspace.off('quit', this.killServer)
+
 	}
 
 

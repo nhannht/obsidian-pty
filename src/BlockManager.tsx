@@ -3,7 +3,7 @@ import {createRoot} from "react-dom/client";
 import {StrictMode} from "react";
 import {FileSystemAdapter} from "obsidian";
 import {exec} from "child_process";
-import {BlockSetting, ServerConfig} from "./global";
+import {BlockSetting, ProfileConfig} from "./global";
 import {ZenTermBlock} from "./ZenTermBlock";
 import net from "net";
 import path from "path";
@@ -22,19 +22,7 @@ export default class BlockManager {
 
 
 	loadServerConfigs(){
-		const vaultAdapter = this.plugin.app.vault.adapter as FileSystemAdapter;
-		const vaultPath = vaultAdapter.getBasePath();
 
-
-		try {
-			const data = fs.readFileSync(this.plugin.serverConfigPath, "utf-8");
-			const server_profiles = JSON.parse(data) as ServerConfig[];
-			console.log("Loaded backend configurations:", server_profiles);
-			return server_profiles
-		} catch (error) {
-			console.error("Error loading backend configurations:", error);
-		}
-		return []
 	}
 
 	async registerZenTermBlock() {
@@ -53,7 +41,7 @@ export default class BlockManager {
 						ctx={ctx}
 
 						blockSetting={blockSetting}
-						server_profiles={this.loadServerConfigs()}
+						// server_profiles={this.loadServerConfigs()}
 						plugin={this.plugin}/>
 				</StrictMode>
 			)
